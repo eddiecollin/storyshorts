@@ -1,8 +1,13 @@
-export const supportedVideoTypes = ["video/mp4", "video/webm"];
+export const supportedVideoTypes = ["video/mp4", "video/quicktime", "video/x-quicktime", "video/webm"];
+export const supportedVideoExtensions = [".mp4", ".mov", ".webm"];
 
 export function validateGameplayFile(file: File): string | null {
-  if (!supportedVideoTypes.includes(file.type)) {
-    return "Upload an MP4 or WebM gameplay video.";
+  const lowerName = file.name.toLowerCase();
+  const hasSupportedType = supportedVideoTypes.includes(file.type);
+  const hasSupportedExtension = supportedVideoExtensions.some((extension) => lowerName.endsWith(extension));
+
+  if (!hasSupportedType && !hasSupportedExtension) {
+    return "Upload an MP4, MOV or WebM gameplay video.";
   }
 
   const maxSizeMb = 500;

@@ -64,11 +64,11 @@ Modern Chromium browsers are the best target. Safari support can vary, especiall
 
 The MVP avoids long FFmpeg work inside Vercel serverless functions. Instead:
 
-1. The browser loads the user-supplied MP4/WebM gameplay.
+1. The browser loads the user-supplied MP4, MOV, or WebM gameplay when the format can be decoded by the browser.
 2. A 1080x1920 canvas draws the cropped gameplay and animated captions.
 3. Web Audio mixes gameplay audio and OpenAI narration when narration is available.
 4. `MediaRecorder` records the canvas composition to WebM.
-5. `ffmpeg.wasm` transcodes the WebM output to MP4.
+5. `ffmpeg.wasm` transcodes the WebM recording to a 1080x1920 MP4 with H.264 video and AAC audio.
 
 The isolated renderer lives in `lib/video-rendering.ts`.
 

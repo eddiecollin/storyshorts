@@ -145,7 +145,13 @@ export function ControlPanel({
             <FileVideo size={17} />
             Upload Gameplay
           </Button>
-          <input ref={fileInputRef} type="file" accept="video/mp4,video/webm" className="hidden" onChange={onGameplayUpload} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/x-quicktime,video/webm"
+            className="hidden"
+            onChange={onGameplayUpload}
+          />
           <Button type="button" variant="secondary" onClick={onGenerateAudio} disabled={isGeneratingAudio || !storyText.trim()}>
             {isGeneratingAudio ? <RefreshCw className="animate-spin" size={17} /> : <Mic2 size={17} />}
             Generate Narration

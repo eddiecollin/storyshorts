@@ -127,7 +127,7 @@ export function VideoPreview({
             />
           ) : (
             <div className="absolute inset-0 grid place-items-center bg-[linear-gradient(160deg,#111,#202020_48%,#0a0a0a)] px-8 text-center text-sm text-neutral-400">
-              Upload MP4 or WebM gameplay to see the vertical composition.
+              Upload MP4, MOV or WebM gameplay to see the vertical composition.
             </div>
           )}
           {audioUrl ? <audio ref={audioRef} src={audioUrl} /> : null}
