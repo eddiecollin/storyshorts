@@ -4,7 +4,7 @@ const wordsPerSecond = 2.35;
 
 export function estimateNarrationDuration(text: string): number {
   const words = getWords(text).length;
-  return Math.max(8, Math.min(100, words / wordsPerSecond));
+  return Math.max(8, Math.min(180, words / wordsPerSecond));
 }
 
 export function createCaptionCues(text: string, duration?: number): CaptionCue[] {

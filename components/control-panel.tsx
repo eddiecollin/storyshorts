@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileVideo, Mic2, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { Download, FileVideo, Mic2, RefreshCw, Sparkles, Wand2, X } from "lucide-react";
 import { ChangeEvent, RefObject } from "react";
 import { captionPresets, exampleStory, storyCategories, voices } from "@/lib/constants";
 import { formatDuration } from "@/lib/file-handling";
@@ -35,6 +35,7 @@ type ControlPanelProps = {
   onGenerateStory: () => void;
   onGenerateAudio: () => void;
   onGenerateVideo: () => void;
+  onCancelRender: () => void;
   onSettingsChange: (settings: GameplaySettings) => void;
 };
 
@@ -66,6 +67,7 @@ export function ControlPanel({
   onGenerateStory,
   onGenerateAudio,
   onGenerateVideo,
+  onCancelRender,
   onSettingsChange
 }: ControlPanelProps) {
   return (
@@ -213,11 +215,17 @@ export function ControlPanel({
               </div>
             </div>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className={`grid gap-3 ${isRendering ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             <Button type="button" onClick={onGenerateVideo} disabled={isRendering || !storyText.trim()} className="w-full">
               {isRendering ? <RefreshCw className="animate-spin" size={17} /> : <Wand2 size={17} />}
               Generate Video
             </Button>
+            {isRendering ? (
+              <Button type="button" variant="secondary" onClick={onCancelRender} className="w-full">
+                <X size={17} />
+                Cancel Render
+              </Button>
+            ) : null}
             <a
               href={exportedUrl ?? undefined}
               download="storyshorts.mp4"

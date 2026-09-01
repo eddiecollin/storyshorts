@@ -46,7 +46,7 @@ export type GeneratedStory = {
 };
 
 export type RenderProgress = {
-  stage: "preparing" | "recording" | "transcoding" | "complete";
+  stage: "preparing" | "recording" | "finalizing" | "transcoding" | "complete";
   progress: number;
   message: string;
 };

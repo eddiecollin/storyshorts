@@ -59,6 +59,7 @@ function EditorWorkspaceContent() {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState<RenderProgress | null>(null);
+  const renderAbortControllerRef = useRef<AbortController | null>(null);
   const objectUrlsRef = useRef({ gameplayUrl: null as string | null, audioUrl: null as string | null, exportedUrl: null as string | null });
 
   useEffect(() => {
@@ -206,8 +207,10 @@ function EditorWorkspaceContent() {
       setSettings((current) => ({
         ...current,
         trimStart: 0,
-        trimEnd: Math.min(video.duration, 90)
+        trimEnd: video.duration
       }));
+      video.removeAttribute("src");
+      video.load();
       setNotice({ type: "success", text: "Gameplay uploaded." });
     };
     video.onerror = () => {
@@ -227,6 +230,8 @@ function EditorWorkspaceContent() {
     }
 
     setIsRendering(true);
+    const abortController = new AbortController();
+    renderAbortControllerRef.current = abortController;
     setRenderProgress({ stage: "preparing", progress: 1, message: "Starting render..." });
     setNotice(null);
 
@@ -238,7 +243,8 @@ function EditorWorkspaceContent() {
         captionPreset,
         duration,
         settings,
-        onProgress: setRenderProgress
+        onProgress: setRenderProgress,
+        signal: abortController.signal
       });
       setExportedUrl((current) => blobToObjectUrl(current, output));
       setNotice({
@@ -248,10 +254,20 @@ function EditorWorkspaceContent() {
           : "MP4 export is ready without AI narration. Add OPENAI_API_KEY and generate narration for a voiced export."
       });
     } catch (error) {
-      setNotice({ type: "error", text: error instanceof Error ? error.message : "Rendering failed." });
+      console.error("[StoryShorts renderer] Render failed", error);
+      setNotice({
+        type: isAbortError(error) ? "info" : "error",
+        text: error instanceof Error ? error.message : "Rendering failed."
+      });
     } finally {
+      renderAbortControllerRef.current = null;
       setIsRendering(false);
     }
+  }
+
+  function handleCancelRender() {
+    renderAbortControllerRef.current?.abort();
+    setRenderProgress({ stage: "finalizing", progress: renderProgress?.progress ?? 0, message: "Cancelling render..." });
   }
 
   return (
@@ -286,6 +302,7 @@ function EditorWorkspaceContent() {
           onGenerateStory={handleGenerateStory}
           onGenerateAudio={handleGenerateAudio}
           onGenerateVideo={handleGenerateVideo}
+          onCancelRender={handleCancelRender}
           onSettingsChange={setSettings}
         />
       </div>
@@ -301,6 +318,10 @@ function EditorWorkspaceContent() {
       />
     </main>
   );
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function Notice({ type, text }: { type: "info" | "success" | "error"; text: string }) {
