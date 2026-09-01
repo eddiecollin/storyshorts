@@ -2,6 +2,7 @@ import type { GeneratedStory, StoryCategory, VoiceId } from "@/types/storyshorts
 import { buildDemoStory } from "@/lib/demo-story";
 
 const openAiBaseUrl = "https://api.openai.com/v1";
+const maxSpeechInputCharacters = 4096;
 
 export function hasOpenAiKey() {
   return Boolean(process.env.OPENAI_API_KEY);
@@ -91,7 +92,14 @@ export async function createNarrationAudio({ text, voice }: { text: string; voic
     throw new MissingApiKeyError("OpenAI text-to-speech requires OPENAI_API_KEY.");
   }
 
+  if (text.length > maxSpeechInputCharacters) {
+    throw new Error(
+      `Narration text is ${text.length} characters. OpenAI speech supports up to ${maxSpeechInputCharacters} characters per request.`
+    );
+  }
+
   const model = process.env.OPENAI_TTS_MODEL || "gpt-4o-mini-tts";
+  console.info("[StoryShorts TTS] Requesting narration", { model, voice, textLength: text.length });
   const response = await fetch(`${openAiBaseUrl}/audio/speech`, {
     method: "POST",
     headers: {
@@ -108,9 +116,16 @@ export async function createNarrationAudio({ text, voice }: { text: string; voic
 
   if (!response.ok) {
     const details = await safeText(response);
+    console.error("[StoryShorts TTS] Narration request failed", {
+      model,
+      voice,
+      status: response.status,
+      details
+    });
     throw new Error(details || "Narration generation failed.");
   }
 
+  console.info("[StoryShorts TTS] Narration request complete", { model, voice });
   return response.arrayBuffer();
 }
 

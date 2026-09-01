@@ -6,7 +6,7 @@ import { ChangeEvent, Suspense, useEffect, useMemo, useRef, useState } from "rea
 import { ControlPanel } from "@/components/control-panel";
 import { VideoPreview } from "@/components/video-preview";
 import { createCaptionCues, estimateNarrationDuration } from "@/lib/captions";
-import { blobToObjectUrl, validateGameplayFile } from "@/lib/file-handling";
+import { blobToObjectUrl, formatDuration, validateGameplayFile } from "@/lib/file-handling";
 import { getTemplate } from "@/lib/templates";
 import { renderVerticalVideo } from "@/lib/video-rendering";
 import type {
@@ -50,6 +50,7 @@ function EditorWorkspaceContent() {
   const [gameplayDuration, setGameplayDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [narrationDuration, setNarrationDuration] = useState<number | null>(null);
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: "info" | "success" | "error"; text: string } | null>({
     type: "info",
@@ -96,11 +97,8 @@ function EditorWorkspaceContent() {
   }, []);
 
   const duration = useMemo(() => {
-    if (audioBlob && audioUrl) {
-      return estimateNarrationDuration(storyText);
-    }
-    return estimateNarrationDuration(storyText);
-  }, [audioBlob, audioUrl, storyText]);
+    return narrationDuration ?? estimateNarrationDuration(storyText);
+  }, [narrationDuration, storyText]);
 
   const cues = useMemo(() => createCaptionCues(storyText, duration), [duration, storyText]);
 
@@ -122,13 +120,7 @@ function EditorWorkspaceContent() {
 
       setTitle(data.title);
       setStoryText(data.story);
-      setAudioBlob(null);
-      setAudioUrl((current) => {
-        if (current) {
-          URL.revokeObjectURL(current);
-        }
-        return null;
-      });
+      clearNarration();
       setNotice({
         type: data.demo ? "info" : "success",
         text: data.demo
@@ -150,6 +142,7 @@ function EditorWorkspaceContent() {
 
     setIsGeneratingAudio(true);
     setNotice(null);
+    console.info("[StoryShorts TTS] Generating narration", { voice, textLength: storyText.length });
 
     try {
       const response = await fetch("/api/tts", {
@@ -164,18 +157,63 @@ function EditorWorkspaceContent() {
       }
 
       const blob = await response.blob();
+      if (!blob.size) {
+        throw new Error("Narration generation returned an empty audio file.");
+      }
+
+      const nextAudioUrl = URL.createObjectURL(blob);
+      let measuredDuration: number;
+      try {
+        measuredDuration = await measureAudioDuration(nextAudioUrl);
+      } catch (error) {
+        URL.revokeObjectURL(nextAudioUrl);
+        throw error;
+      }
       setAudioBlob(blob);
-      setAudioUrl((current) => blobToObjectUrl(current, blob));
-      setNotice({ type: "success", text: "Narration generated." });
+      setAudioUrl((current) => {
+        if (current) {
+          URL.revokeObjectURL(current);
+        }
+        return nextAudioUrl;
+      });
+      setNarrationDuration(measuredDuration);
+      console.info("[StoryShorts TTS] Narration ready", {
+        voice,
+        bytes: blob.size,
+        duration: measuredDuration
+      });
+      setNotice({ type: "success", text: `Narration generated (${formatDuration(measuredDuration)}).` });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Narration generation failed.";
+      console.error("[StoryShorts TTS] Narration failed", error);
       setNotice({
-        type: "info",
+        type: message.includes("OPENAI_API_KEY") ? "info" : "error",
         text: `${message} You can still preview with browser speech and render a captioned gameplay video.`
       });
     } finally {
       setIsGeneratingAudio(false);
     }
+  }
+
+  function handleStoryTextChange(value: string) {
+    setStoryText(value);
+    clearNarration();
+  }
+
+  function handleVoiceChange(value: VoiceId) {
+    setVoice(value);
+    clearNarration();
+  }
+
+  function clearNarration() {
+    setAudioBlob(null);
+    setNarrationDuration(null);
+    setAudioUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
   }
 
   function handleGameplayUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -293,10 +331,10 @@ function EditorWorkspaceContent() {
           renderProgress={renderProgress}
           fileInputRef={fileInputRef}
           onTitleChange={setTitle}
-          onStoryTextChange={setStoryText}
+          onStoryTextChange={handleStoryTextChange}
           onPremiseChange={setPremise}
           onCategoryChange={setCategory}
-          onVoiceChange={setVoice}
+          onVoiceChange={handleVoiceChange}
           onCaptionPresetChange={setCaptionPreset}
           onGameplayUpload={handleGameplayUpload}
           onGenerateStory={handleGenerateStory}
@@ -322,6 +360,47 @@ function EditorWorkspaceContent() {
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+function measureAudioDuration(audioUrl: string) {
+  return new Promise<number>((resolve, reject) => {
+    const audio = document.createElement("audio");
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("The narration audio was generated, but the browser could not read its duration."));
+    }, 15000);
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("error", handleError);
+      audio.removeAttribute("src");
+      audio.load();
+    };
+
+    const handleLoadedMetadata = () => {
+      const duration = audio.duration;
+      cleanup();
+
+      if (Number.isFinite(duration) && duration > 0) {
+        resolve(duration);
+        return;
+      }
+
+      reject(new Error("The narration audio duration is invalid."));
+    };
+
+    const handleError = () => {
+      cleanup();
+      reject(new Error("The narration audio was generated, but the browser could not load it."));
+    };
+
+    audio.preload = "metadata";
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("error", handleError);
+    audio.src = audioUrl;
+    audio.load();
+  });
 }
 
 function Notice({ type, text }: { type: "info" | "success" | "error"; text: string }) {

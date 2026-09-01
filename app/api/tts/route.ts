@@ -12,7 +12,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Enter story text before generating narration." }, { status: 400 });
     }
 
-    const voice = voices.some((item) => item.id === body.voice) ? (body.voice as VoiceId) : "nova";
+    if (!voices.some((item) => item.id === body.voice)) {
+      return NextResponse.json({ error: "Choose a supported narration voice." }, { status: 400 });
+    }
+
+    const voice = body.voice as VoiceId;
     const audio = await createNarrationAudio({ text, voice });
 
     return new Response(audio, {

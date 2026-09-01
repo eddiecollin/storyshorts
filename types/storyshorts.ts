@@ -10,7 +10,20 @@ export type StoryCategory =
 
 export type CaptionPreset = "Classic" | "Yellow Highlight" | "Minimal" | "Bold";
 
-export type VoiceId = "alloy" | "ash" | "coral" | "echo" | "fable" | "nova" | "onyx" | "sage" | "shimmer";
+export type VoiceId =
+  | "alloy"
+  | "ash"
+  | "ballad"
+  | "coral"
+  | "echo"
+  | "fable"
+  | "marin"
+  | "nova"
+  | "onyx"
+  | "sage"
+  | "shimmer"
+  | "verse"
+  | "cedar";
 
 export type CaptionCue = {
   id: string;
